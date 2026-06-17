@@ -1043,38 +1043,41 @@ async def api_create_task(request: Request):
 
 @app.post("/api/tasks/import")
 async def api_import_tasks(request: Request):
-    user, fail = await require_user(request)
-    if fail:
-        return fail
-    if not can_admin(user["role"]):
-        return error("Only the super admin can import CSV.", 403)
-    text = (await request.body()).decode("utf-8")
-    reader = csv.DictReader(io.StringIO(text))
-    tasks = []
-    for raw in reader:
-        if not any((value or "").strip() for value in raw.values()):
-            continue
-        tasks.append(normalize_task(raw))
-    if not tasks:
-        return {"imported": 0}
-    with conn() as db:
-        with db.cursor() as cur:
-            if request.query_params.get("replace") == "1":
-                for table in ["tasks", "activity_log", "task_comments", "task_assets", "approval_events", "task_checklists"]:
-                    cur.execute(f"DELETE FROM {table}")
-            fields = ["id", *TASK_FIELDS, "createdAt", "updatedAt", "completedAt", "lastStageChangedAt"]
-            cols = ", ".join([quote_ident(f) for f in fields])
-            updates = ", ".join([f"{quote_ident(f)} = EXCLUDED.{quote_ident(f)}" for f in fields if f != "id"])
-            sql = f"INSERT INTO tasks({cols}) VALUES({qmarks(fields)}) ON CONFLICT (id) DO UPDATE SET {updates}"
-            cur.executemany(sql, [[task.get(f, "") for f in fields] for task in tasks])
-            checklist_rows = [(task["id"], step, False, "", now_iso()) for task in tasks for step in CHECKLIST_STEPS]
-            cur.executemany(
-                'INSERT INTO task_checklists("taskId", step, "isDone", "updatedBy", "updatedAt") VALUES(%s,%s,%s,%s,%s) ON CONFLICT ("taskId", step) DO NOTHING',
-                checklist_rows,
-            )
-            audit_event(cur, user, "tasks_imported", "task", "", {"count": len(tasks)})
-            db.commit()
-    return {"imported": len(tasks)}
+    try:
+        user, fail = await require_user(request)
+        if fail:
+            return fail
+        if not can_admin(user["role"]):
+            return error("Only the super admin can import CSV.", 403)
+        text = (await request.body()).decode("utf-8")
+        reader = csv.DictReader(io.StringIO(text))
+        tasks = []
+        for raw in reader:
+            if not any((value or "").strip() for value in raw.values()):
+                continue
+            tasks.append(normalize_task(raw))
+        if not tasks:
+            return {"imported": 0}
+        with conn() as db:
+            with db.cursor() as cur:
+                if request.query_params.get("replace") == "1":
+                    for table in ["activity_log", "task_comments", "task_assets", "approval_events", "task_checklists", "tasks"]:
+                        cur.execute(f"DELETE FROM {table}")
+                fields = ["id", *TASK_FIELDS, "createdAt", "updatedAt", "completedAt", "lastStageChangedAt"]
+                cols = ", ".join([quote_ident(f) for f in fields])
+                updates = ", ".join([f"{quote_ident(f)} = EXCLUDED.{quote_ident(f)}" for f in fields if f != "id"])
+                sql = f"INSERT INTO tasks({cols}) VALUES({qmarks(fields)}) ON CONFLICT (id) DO UPDATE SET {updates}"
+                cur.executemany(sql, [[task.get(f, "") for f in fields] for task in tasks])
+                checklist_rows = [(task["id"], step, False, "", now_iso()) for task in tasks for step in CHECKLIST_STEPS]
+                cur.executemany(
+                    'INSERT INTO task_checklists("taskId", step, "isDone", "updatedBy", "updatedAt") VALUES(%s,%s,%s,%s,%s) ON CONFLICT ("taskId", step) DO NOTHING',
+                    checklist_rows,
+                )
+                audit_event(cur, user, "tasks_imported", "task", "", {"count": len(tasks)})
+                db.commit()
+        return {"imported": len(tasks)}
+    except Exception as exc:
+        return error(f"Import failed: {exc}", 500)
 
 
 @app.post("/api/tasks/reset")
