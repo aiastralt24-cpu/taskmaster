@@ -97,7 +97,7 @@ def verify_password(password, stored):
 def conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is required for the Vercel API.")
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10)
 
 
 def qmarks(values, start=1):
@@ -110,6 +110,9 @@ def init_db():
         return
     with conn() as db:
         with db.cursor() as cur:
+            cur.execute("SET statement_timeout = '60s'")
+            cur.execute("SET lock_timeout = '20s'")
+            cur.execute("SELECT pg_advisory_xact_lock(2606173401)")
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS tasks (
