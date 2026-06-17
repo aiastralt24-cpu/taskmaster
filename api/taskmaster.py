@@ -12,11 +12,12 @@ from pathlib import Path
 
 import psycopg
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from psycopg.rows import dict_row
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED_PATH = ROOT / "seed" / "AstralVideoTracker.jsx"
+PUBLIC_DIR = ROOT / "public"
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 APP_URL = os.environ.get("TASKMASTER_APP_URL", "https://taskmaster.vercel.app")
@@ -1490,3 +1491,22 @@ async def api_preferences(request: Request):
             refreshed = public_user(cur.fetchone())
             db.commit()
     return {"user": refreshed}
+
+
+@app.get("/")
+async def static_index():
+    return FileResponse(PUBLIC_DIR / "index.html")
+
+
+@app.get("/{asset_path:path}")
+async def static_asset(asset_path: str):
+    if asset_path.startswith("api/"):
+        return error("Not found.", 404)
+    target = (PUBLIC_DIR / asset_path).resolve()
+    try:
+        target.relative_to(PUBLIC_DIR.resolve())
+    except ValueError:
+        return error("Not found.", 404)
+    if not target.exists() or target.is_dir():
+        return error("Not found.", 404)
+    return FileResponse(target)
