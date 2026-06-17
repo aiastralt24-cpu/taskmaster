@@ -456,10 +456,10 @@ def require_database():
 
 
 async def current_user(request: Request):
-    init_db()
     token = request.cookies.get(SESSION_COOKIE, "")
     if not token:
         return None
+    init_db()
     with conn() as db:
         with db.cursor() as cur:
             cur.execute(
@@ -848,6 +848,10 @@ def access_matrix(cur):
 
 def digest_for_user(user):
     tasks = query_tasks({}, user)
+    return digest_for_tasks(tasks)
+
+
+def digest_for_tasks(tasks):
     today, end_week = today_date(), time.strftime("%Y-%m-%d", time.localtime(time.time() + 6 * 86400))
     due_today = [t for t in tasks if t.get("deadline") == today and t.get("status") not in DONE_STATUSES]
     due_soon = [t for t in tasks if t.get("deadline") and today < t["deadline"] <= end_week and t.get("status") not in DONE_STATUSES]
@@ -860,6 +864,35 @@ def digest_for_user(user):
 
 def deployment_status():
     return {"appUrl": APP_URL, "databasePath": "Postgres DATABASE_URL", "smtpConfigured": SMTP_CONFIGURED, "httpsReady": APP_URL.startswith("https://"), "backupScript": "scripts/export_sqlite_to_json.py", "migrationStyle": "Postgres schema in api/taskmaster.py", "checks": [{"label": "HTTPS/domain configured", "ok": APP_URL.startswith("https://")}, {"label": "Email provider configured", "ok": SMTP_CONFIGURED}, {"label": "Postgres DATABASE_URL set", "ok": bool(DATABASE_URL)}, {"label": "Aniket single super admin enforced", "ok": True}]}
+
+
+def options_for(visible, cur):
+    return {
+        "brand": sorted({t.get("brand") for t in visible if t.get("brand")}),
+        "bucket": sorted({t.get("bucket") for t in visible if t.get("bucket")}),
+        "zone": sorted({t.get("zone") for t in visible if t.get("zone")}),
+        "agency": sorted({t.get("agency") for t in visible if t.get("agency")}),
+        "status": STATUSES,
+        "owner": sorted({t.get("owner") for t in visible if t.get("owner")}),
+        "bucketAdmin": sorted({t.get("bucketAdmin") for t in visible if t.get("bucketAdmin")}),
+        "primaryOwner": sorted({t.get("primaryOwner") for t in visible if t.get("primaryOwner")}),
+        "secondaryOwner": sorted({t.get("secondaryOwner") for t in visible if t.get("secondaryOwner")}),
+        "reviewer": sorted({t.get("reviewer") for t in visible if t.get("reviewer")}),
+        "priority": PRIORITIES,
+        "roles": USER_ROLES,
+        "assetTypes": ASSET_TYPES,
+        "checklistSteps": CHECKLIST_STEPS,
+        "users": all_users(cur),
+    }
+
+
+def planning_for(tasks):
+    timeline = [t for t in tasks if t.get("plannedStart") or t.get("deadline") or t.get("publishDate")]
+    return {
+        "calendar": sorted(timeline, key=lambda t: t.get("deadline") or t.get("publishDate") or t.get("plannedStart") or "")[:80],
+        "missingDates": [t for t in tasks if not t.get("deadline")][:80],
+        "timeline": timeline[:120],
+    }
 
 
 def update_task(cur, task_id, changes, user):
@@ -880,6 +913,8 @@ def update_task(cur, task_id, changes, user):
 @app.middleware("http")
 async def ensure_db(request: Request, call_next):
     if request.url.path.startswith("/api"):
+        if request.url.path == "/api/me" and not request.cookies.get(SESSION_COOKIE, ""):
+            return await call_next(request)
         db_error = require_database()
         if db_error:
             return db_error
@@ -1072,6 +1107,42 @@ async def api_command(request: Request):
     return command_center_for(query_tasks(dict(request.query_params), user))
 
 
+@app.get("/api/bootstrap")
+async def api_bootstrap(request: Request):
+    user, fail = await require_user(request)
+    if fail:
+        return fail
+    params = dict(request.query_params)
+    tasks = query_tasks(params, user)
+    name = user["displayName"]
+    mine = [t for t in tasks if name in [t.get("primaryOwner"), t.get("secondaryOwner"), t.get("bucketAdmin"), t.get("reviewer"), t.get("owner")]]
+    payload = {
+        "tasks": {"tasks": tasks},
+        "analytics": analytics_for(tasks),
+        "command": command_center_for(tasks),
+        "myWork": {"tasks": mine, "counts": analytics_for(mine)["cards"]},
+        "planning": planning_for(tasks),
+        "digest": digest_for_tasks(tasks),
+        "notifications": {"notifications": []},
+        "users": {"users": []},
+        "accessMatrix": {"matrix": []},
+        "deployment": None,
+        "audit": {"events": []},
+    }
+    with conn() as db:
+        with db.cursor() as cur:
+            payload["options"] = options_for(tasks, cur)
+            cur.execute('SELECT * FROM notifications WHERE "userId" = %s ORDER BY "isRead" ASC, id DESC LIMIT 80', [user["id"]])
+            payload["notifications"] = {"notifications": cur.fetchall()}
+            if can_admin(user["role"]) and params.get("view") == "admin":
+                payload["users"] = {"users": all_users(cur)}
+                payload["accessMatrix"] = {"matrix": access_matrix(cur)}
+                payload["deployment"] = deployment_status()
+                cur.execute("SELECT * FROM system_audit ORDER BY id DESC LIMIT 120")
+                payload["audit"] = {"events": cur.fetchall()}
+    return payload
+
+
 @app.get("/api/options")
 async def api_options(request: Request):
     user, fail = await require_user(request)
@@ -1080,7 +1151,7 @@ async def api_options(request: Request):
     visible = query_tasks({}, user)
     with conn() as db:
         with db.cursor() as cur:
-            return {"brand": sorted({t.get("brand") for t in visible if t.get("brand")}), "bucket": sorted({t.get("bucket") for t in visible if t.get("bucket")}), "zone": sorted({t.get("zone") for t in visible if t.get("zone")}), "agency": sorted({t.get("agency") for t in visible if t.get("agency")}), "status": STATUSES, "owner": sorted({t.get("owner") for t in visible if t.get("owner")}), "bucketAdmin": sorted({t.get("bucketAdmin") for t in visible if t.get("bucketAdmin")}), "primaryOwner": sorted({t.get("primaryOwner") for t in visible if t.get("primaryOwner")}), "secondaryOwner": sorted({t.get("secondaryOwner") for t in visible if t.get("secondaryOwner")}), "reviewer": sorted({t.get("reviewer") for t in visible if t.get("reviewer")}), "priority": PRIORITIES, "roles": USER_ROLES, "assetTypes": ASSET_TYPES, "checklistSteps": CHECKLIST_STEPS, "users": all_users(cur)}
+            return options_for(visible, cur)
 
 
 @app.get("/api/users")

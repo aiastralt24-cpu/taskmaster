@@ -158,20 +158,9 @@ async function loadAll() {
   render();
   try {
     const q = params();
-    const [tasks, analytics, command, options, notifications, digest, myWork, planning, users, accessMatrix, deployment, audit] = await Promise.all([
-      api(`/api/tasks?${q}`),
-      api(`/api/analytics?${q}`),
-      api(`/api/analytics/command-center?${q}`),
-      api("/api/options"),
-      api("/api/notifications"),
-      api("/api/notifications/digest"),
-      api(`/api/my-work?${q}`),
-      api(`/api/planning?${q}`),
-      isAdmin() ? api("/api/users") : Promise.resolve({ users: [] }),
-      isAdmin() ? api("/api/admin/access-matrix") : Promise.resolve({ matrix: [] }),
-      isAdmin() ? api("/api/settings/deployment") : Promise.resolve(null),
-      isAdmin() ? api("/api/admin/audit") : Promise.resolve({ events: [] }),
-    ]);
+    const bootstrapParams = new URLSearchParams(q);
+    bootstrapParams.set("view", state.view);
+    const { tasks, analytics, command, options, notifications, digest, myWork, planning, users, accessMatrix, deployment, audit } = await api(`/api/bootstrap?${bootstrapParams.toString()}`);
     state.tasks = tasks.tasks;
     state.analytics = analytics;
     state.command = command;
