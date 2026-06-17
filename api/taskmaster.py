@@ -97,7 +97,7 @@ def verify_password(password, stored):
 def conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is required for the Vercel API.")
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10)
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10, prepare_threshold=None)
 
 
 def qmarks(values, start=1):
