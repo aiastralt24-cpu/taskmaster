@@ -1059,6 +1059,9 @@ async def api_import_tasks(request: Request):
         return {"imported": 0}
     with conn() as db:
         with db.cursor() as cur:
+            if request.query_params.get("replace") == "1":
+                for table in ["tasks", "activity_log", "task_comments", "task_assets", "approval_events", "task_checklists"]:
+                    cur.execute(f"DELETE FROM {table}")
             fields = ["id", *TASK_FIELDS, "createdAt", "updatedAt", "completedAt", "lastStageChangedAt"]
             cols = ", ".join([quote_ident(f) for f in fields])
             updates = ", ".join([f"{quote_ident(f)} = EXCLUDED.{quote_ident(f)}" for f in fields if f != "id"])
@@ -1163,7 +1166,10 @@ async def api_users(request: Request):
         return error("Only the super admin can manage users.", 403)
     with conn() as db:
         with db.cursor() as cur:
-            return {"users": all_users(cur)}
+            try:
+                return {"users": all_users(cur)}
+            except Exception as exc:
+                return error(f"Could not load users: {exc}", 500)
 
 
 @app.post("/api/users")
