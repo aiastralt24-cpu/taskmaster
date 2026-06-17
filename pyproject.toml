@@ -1,2 +1,12 @@
+[project]
+name = "taskmaster"
+version = "1.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.115.6",
+  "psycopg[binary]==3.2.3",
+  "python-multipart==0.0.20",
+]
+
 [tool.vercel]
 entrypoint = "api.taskmaster:app"
