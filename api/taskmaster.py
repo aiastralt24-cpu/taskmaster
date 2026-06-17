@@ -855,7 +855,7 @@ def digest_for_user(user):
 
 
 def deployment_status():
-    return {"appUrl": APP_URL, "databasePath": "Postgres DATABASE_URL", "smtpConfigured": SMTP_CONFIGURED, "httpsReady": APP_URL.startswith("https://"), "backupScript": "scripts/export_sqlite_to_json.py", "migrationStyle": "Postgres schema in api/index.py", "checks": [{"label": "HTTPS/domain configured", "ok": APP_URL.startswith("https://")}, {"label": "Email provider configured", "ok": SMTP_CONFIGURED}, {"label": "Postgres DATABASE_URL set", "ok": bool(DATABASE_URL)}, {"label": "Aniket single super admin enforced", "ok": True}]}
+    return {"appUrl": APP_URL, "databasePath": "Postgres DATABASE_URL", "smtpConfigured": SMTP_CONFIGURED, "httpsReady": APP_URL.startswith("https://"), "backupScript": "scripts/export_sqlite_to_json.py", "migrationStyle": "Postgres schema in api/taskmaster.py", "checks": [{"label": "HTTPS/domain configured", "ok": APP_URL.startswith("https://")}, {"label": "Email provider configured", "ok": SMTP_CONFIGURED}, {"label": "Postgres DATABASE_URL set", "ok": bool(DATABASE_URL)}, {"label": "Aniket single super admin enforced", "ok": True}]}
 
 
 def update_task(cur, task_id, changes, user):

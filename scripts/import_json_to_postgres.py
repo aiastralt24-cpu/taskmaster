@@ -12,7 +12,7 @@ from psycopg.rows import dict_row
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import api.index as taskmaster_api  # noqa: E402
+import api.taskmaster as taskmaster_api  # noqa: E402
 
 init_db = taskmaster_api.init_db
 now_iso = taskmaster_api.now_iso

@@ -1,0 +1,8 @@
+server.py
+__pycache__/
+.playwright-cli/
+data/
+taskmaster/
+*.log
+.env
+.env.*

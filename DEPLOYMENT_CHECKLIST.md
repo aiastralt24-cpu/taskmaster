@@ -5,7 +5,7 @@ Use this before giving Taskmaster to a wider internal or agency team.
 ## Target Architecture
 
 - Vercel static frontend from `public/`.
-- Vercel Python serverless API from `api/index.py`.
+- Vercel Python serverless API from `api/taskmaster.py`.
 - Neon Postgres as production data store through `DATABASE_URL`.
 - Local SQLite remains private and is used only for local development or one-time data export.
 

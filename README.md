@@ -7,7 +7,7 @@ Production command-center tracker for Astral video/content operations.
 Taskmaster is prepared for Vercel as:
 
 - `public/` static frontend
-- `api/index.py` FastAPI serverless API
+- `api/taskmaster.py` FastAPI serverless API
 - Neon Postgres via `DATABASE_URL`
 - local SQLite only for local/offline development and one-time production import
 
