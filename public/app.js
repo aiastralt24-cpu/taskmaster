@@ -311,12 +311,13 @@ function renderLogin() {
         <span>Taskmaster</span>
       </div>
       <h1>Production Command Center</h1>
+      <div class="login-context">Secure access for Astral production teams</div>
       <form class="login-form" data-login-form>
-        <label>User ID<input name="username" autocomplete="username" value="${escapeHtml(state.login.username)}" placeholder="aniket" /></label>
-        <label>Password<input name="password" type="password" autocomplete="current-password" value="${escapeHtml(state.login.password)}" placeholder="Password" /></label>
+        <label>User ID<input name="username" autocomplete="username" value="${escapeHtml(state.login.username)}" placeholder="Enter your user ID" /></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" value="${escapeHtml(state.login.password)}" placeholder="Enter your password" /></label>
         <button class="btn" type="submit">Sign in</button>
       </form>
-      <div class="login-help">Initial password: <strong>Taskmaster@2026</strong></div>
+      <div class="login-support">Need access or a password reset? Contact your Taskmaster admin.</div>
       ${state.error ? `<div class="error compact">${escapeHtml(state.error)}</div>` : ""}
     </section>
   </main>`;
