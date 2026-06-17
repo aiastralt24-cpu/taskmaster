@@ -310,8 +310,7 @@ function renderLogin() {
         <img src="/astral-logo-cropped.jpg" alt="Astral" />
         <span>Taskmaster</span>
       </div>
-      <h1>Sign in to Production Command Center</h1>
-      <p>Use your Taskmaster user ID and password.</p>
+      <h1>Production Command Center</h1>
       <form class="login-form" data-login-form>
         <label>User ID<input name="username" autocomplete="username" value="${escapeHtml(state.login.username)}" placeholder="aniket" /></label>
         <label>Password<input name="password" type="password" autocomplete="current-password" value="${escapeHtml(state.login.password)}" placeholder="Password" /></label>
