@@ -1050,28 +1050,28 @@ async def api_import_tasks(request: Request):
         return error("Only the super admin can import CSV.", 403)
     text = (await request.body()).decode("utf-8")
     reader = csv.DictReader(io.StringIO(text))
-    imported = 0
+    tasks = []
+    for raw in reader:
+        if not any((value or "").strip() for value in raw.values()):
+            continue
+        tasks.append(normalize_task(raw))
+    if not tasks:
+        return {"imported": 0}
     with conn() as db:
         with db.cursor() as cur:
-            for raw in reader:
-                existing = None
-                if raw.get("id"):
-                    cur.execute("SELECT * FROM tasks WHERE id = %s", [raw["id"]])
-                    existing = cur.fetchone()
-                raw = canonicalize_task_people(cur, raw)
-                task = normalize_task(raw, existing)
-                if existing:
-                    fields = ["no", *TASK_FIELDS[1:], "createdAt", "updatedAt", "completedAt", "lastStageChangedAt"]
-                    sets = ", ".join([f"{quote_ident(f)} = %s" for f in fields])
-                    cur.execute(f"UPDATE tasks SET {sets} WHERE id = %s", [task[f] for f in fields] + [task["id"]])
-                    log_activity(cur, task["id"], "import_update", user["displayName"], existing, task)
-                else:
-                    insert_task(cur, task)
-                    log_activity(cur, task["id"], "import_create", user["displayName"], {}, task)
-                imported += 1
-            audit_event(cur, user, "tasks_imported", "task", "", {"count": imported})
+            fields = ["id", *TASK_FIELDS, "createdAt", "updatedAt", "completedAt", "lastStageChangedAt"]
+            cols = ", ".join([quote_ident(f) for f in fields])
+            updates = ", ".join([f"{quote_ident(f)} = EXCLUDED.{quote_ident(f)}" for f in fields if f != "id"])
+            sql = f"INSERT INTO tasks({cols}) VALUES({qmarks(fields)}) ON CONFLICT (id) DO UPDATE SET {updates}"
+            cur.executemany(sql, [[task.get(f, "") for f in fields] for task in tasks])
+            checklist_rows = [(task["id"], step, False, "", now_iso()) for task in tasks for step in CHECKLIST_STEPS]
+            cur.executemany(
+                'INSERT INTO task_checklists("taskId", step, "isDone", "updatedBy", "updatedAt") VALUES(%s,%s,%s,%s,%s) ON CONFLICT ("taskId", step) DO NOTHING',
+                checklist_rows,
+            )
+            audit_event(cur, user, "tasks_imported", "task", "", {"count": len(tasks)})
             db.commit()
-    return {"imported": imported}
+    return {"imported": len(tasks)}
 
 
 @app.post("/api/tasks/reset")
