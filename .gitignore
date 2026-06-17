@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .playwright-cli/
+.vercel/
 
 # Live operational data: contains auth/session/reset-token state.
 data/*.sqlite3
@@ -18,3 +19,4 @@ taskmaster/
 .env
 .env.*
 *.log
+.vercel
